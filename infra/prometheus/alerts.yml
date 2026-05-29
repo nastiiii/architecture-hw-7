@@ -1,0 +1,52 @@
+groups:
+  - name: smart-warehouse-service-alerts
+    rules:
+      - alert: ServiceTargetDown
+        expr: up{job=~"producer|consumer"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service target is down"
+          description: "{{ $labels.job }} has not been scraped successfully for 30 seconds."
+
+      - alert: HighHttpErrorRate
+        expr: |
+          (
+            sum by (job) (rate(http_request_errors_total{job=~"producer|consumer"}[1m]))
+            /
+            clamp_min(sum by (job) (rate(http_requests_total{job=~"producer|consumer"}[1m])), 0.001)
+          ) > 0.05
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP error rate"
+          description: "{{ $labels.job }} error rate is above 5%."
+
+      - alert: HighP95Latency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (job, le) (rate(http_request_duration_seconds_bucket{job=~"producer|consumer"}[1m]))
+          ) > 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High p95 latency"
+          description: "{{ $labels.job }} p95 latency is above 1 second."
+
+      - alert: SystemAvailabilityFailureThreshold
+        expr: |
+          (
+            sum(rate(http_requests_total{job="producer",status!~"5.."}[1m]))
+            /
+            clamp_min(sum(rate(http_requests_total{job="producer"}[1m])), 0.001)
+          ) < 0.95
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "System availability is below failure threshold"
+          description: "Producer API successful request ratio is below 95%."

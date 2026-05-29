@@ -1,0 +1,43 @@
+{
+  "uid": "smart-warehouse-producer",
+  "title": "Producer Service",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Throughput RPS",
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "sum(rate(http_requests_total{job=\"producer\"}[1m]))", "legendFormat": "requests/sec"}]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Error Rate",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "sum(rate(http_request_errors_total{job=\"producer\"}[1m])) / clamp_min(sum(rate(http_requests_total{job=\"producer\"}[1m])), 0.001)", "legendFormat": "error ratio"}]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Latency Percentiles",
+      "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+      "targets": [
+        {"datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"producer\"}[1m])))", "legendFormat": "p50"},
+        {"datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"producer\"}[1m])))", "legendFormat": "p95"},
+        {"datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"producer\"}[1m])))", "legendFormat": "p99"}
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Availability",
+      "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "sum(rate(http_requests_total{job=\"producer\",status!~\"5..\"}[5m])) / clamp_min(sum(rate(http_requests_total{job=\"producer\"}[5m])), 0.001)", "legendFormat": "availability"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}}
+    }
+  ]
+}

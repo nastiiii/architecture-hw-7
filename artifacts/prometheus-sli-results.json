@@ -1,0 +1,35 @@
+[
+  {
+    "name": "producer_error_rate",
+    "sli": "API availability errors",
+    "query": "\n            sum(rate(http_request_errors_total{job=\"producer\"}[1m]))\n            /\n            clamp_min(sum(rate(http_requests_total{job=\"producer\"}[1m])), 0.001)\n        ",
+    "operator": "<",
+    "threshold": 0.01,
+    "slo": "< 1% errors",
+    "failure_threshold": ">= 5% errors",
+    "value": 0.0,
+    "ok": true
+  },
+  {
+    "name": "producer_p95_latency",
+    "sli": "End-to-end API latency",
+    "query": "\n            histogram_quantile(\n              0.95,\n              sum by (le) (http_request_duration_seconds_bucket{job=\"producer\",endpoint=\"/events\"})\n            )\n        ",
+    "operator": "<",
+    "threshold": 0.5,
+    "slo": "p95 < 500ms",
+    "failure_threshold": "p95 > 1000ms",
+    "value": 0.023295454545454546,
+    "ok": true
+  },
+  {
+    "name": "consumer_lag",
+    "sli": "Event processing delay proxy",
+    "query": "sum(consumer_lag)",
+    "operator": "<",
+    "threshold": 2000,
+    "slo": "consumer lag < 100 messages",
+    "failure_threshold": "consumer lag > 2000 messages under CI load",
+    "value": 0.0,
+    "ok": true
+  }
+]

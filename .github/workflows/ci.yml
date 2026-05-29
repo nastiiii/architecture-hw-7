@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Producer unit tests
+        working-directory: producer
+        run: |
+          pip install -r requirements.txt
+          pytest -q
+
+      - name: Consumer unit tests
+        working-directory: aggregation_service
+        run: |
+          pip install -r requirements.txt
+          pytest -q
+
+  integration-e2e-load:
+    name: Integration, E2E and load
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build services
+        run: docker compose build
+
+      - name: Start full test environment
+        run: docker compose up -d
+
+      - name: Install test dependencies
+        run: pip install -r tests/requirements.txt
+
+      - name: Wait for services and monitoring
+        run: python scripts/wait_for_stack.py
+
+      - name: Integration and E2E tests
+        run: pytest -q tests
+
+      - name: Run k6 load test
+        run: |
+          mkdir -p artifacts
+          docker run --rm --network host \
+            -e PRODUCER_URL=http://127.0.0.1:8000 \
+            -v "${PWD}/load-tests:/scripts:ro" \
+            -v "${PWD}/artifacts:/artifacts" \
+            grafana/k6:0.54.0 run --summary-export /artifacts/k6-summary.json /scripts/warehouse_load.js
+
+      - name: Check Prometheus SLI thresholds
+        run: python scripts/check_prometheus_sli.py
+
+      - name: Save docker logs
+        if: always()
+        run: |
+          mkdir -p artifacts
+          docker compose ps > artifacts/docker-compose-ps.txt
+          docker compose logs --no-color > artifacts/docker-compose.log
+
+      - name: Upload CI artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-observability-artifacts
+          path: artifacts/
+
+      - name: Stop environment
+        if: always()
+        run: docker compose down -v --remove-orphans
